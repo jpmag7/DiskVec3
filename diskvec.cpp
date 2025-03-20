@@ -252,20 +252,20 @@ int buildTreeInPlace(T* emb, int32_t* vals, int start, int count, int dim, NodeI
     // Choose a random vantage point from current segment.
     int pivot = start + (std::rand() % count);
     // Swap chosen vantage point to the end (reordering both embeddings and values).
-    swapEmbAndVal(emb, vals, pivot, start + count - 1, dim);
-    int vpIndex = start + count - 1;
+    swapEmbAndVal(emb, vals, pivot, start, dim);
+    int vpIndex = start;
     // Compute distances from each embedding (except vp) to the vantage point.
     //#pragma omp parallel for
-    for (int i = start; i < start + count - 1; i++) {
-        buffer[i - start] = manhattanDistance(emb, i, vpIndex, dim);
+    for (int i = start+1; i < start + count; i++) {
+        buffer[i - start - 1] = manhattanDistance(emb, i, vpIndex, dim);
     }
     // Find median of these distances.
     int m = (count - 1) / 2;
-    std::nth_element(buffer, buffer + m, buffer + count - 1);
-    float median = buffer[m];
+    std::nth_element(buffer, buffer + m + 1, buffer + count);
+    float median = buffer[m + 1];
 
     // Partition embeddings in [start, start+count-1) by median.
-    int i = start, j = start + count - 2;
+    int i = start + 1, j = start + count - 1;
     while (i <= j) {
         float d = manhattanDistance(emb, i, vpIndex, dim);
         if (d <= median) {
@@ -275,9 +275,9 @@ int buildTreeInPlace(T* emb, int32_t* vals, int start, int count, int dim, NodeI
             j--;
         }
     }
-    int leftCount = i - start;
+    int leftCount = i - start - 1;
     // Swap the vantage point (currently at vpIndex) with the element at 'start'.
-    swapEmbAndVal(emb, vals, start, vpIndex, dim);
+    //swapEmbAndVal(emb, vals, start, vpIndex, dim);
     // Recurse: left subtree in [start+1, start+1+leftCount), right subtree in remaining segment.
     int leftSize = buildTreeInPlace(emb, vals, start + 1, leftCount, dim, nodeInfos, buffer);
     int rightSize = buildTreeInPlace(emb, vals, start + 1 + leftCount, count - 1 - leftCount, dim, nodeInfos, buffer);
