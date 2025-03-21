@@ -388,8 +388,8 @@ void buildTreeInPlace(T* emb, int32_t* vals, int start, int count, int dim, Node
         
         // Find median of these distances.
         int m = (currCount - 1) / 2;
-        std::nth_element(buffer, buffer + m + 1, buffer + currCount);
-        float median = buffer[m + 1];
+        std::nth_element(buffer, buffer + m, buffer + currCount);
+        float median = buffer[m];
         
         // Partition embeddings in [currStart, currStart+currCount) by median.
         int i = currStart + 1, j = currStart + currCount - 1;
