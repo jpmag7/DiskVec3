@@ -398,8 +398,8 @@ public:
         // Allocate temporary distance buffer.
         std::cerr << "Number of points: " << num_points << std::endl;
         std::cerr.flush();
-        return true;
         float* buffer = new float[num_points];
+        return true;
         // Build the tree in place (reordering both embeddings and values) and fill nodeInfos.
         buildTreeInPlace(emb, vals, 0, num_points, dimension, nodeInfos, buffer);
         delete[] buffer;
