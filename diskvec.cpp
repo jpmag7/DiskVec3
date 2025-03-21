@@ -125,7 +125,44 @@
     #include <sys/stat.h>
     #include <fcntl.h>
     #include <unistd.h>
+    #include <sys/resource.h>
 #endif
+
+
+bool increase_stack_size(size_t stack_size_mb) {
+    const size_t kStackSize = stack_size_mb * 1024 * 1024; // Convert MB to bytes
+    bool success = false;
+    
+    #ifdef _WIN32
+        return true;
+    #else
+        // Linux/Unix implementation
+        struct rlimit rl;
+        int result = getrlimit(RLIMIT_STACK, &rl);
+        
+        if (result == 0) {
+            if (rl.rlim_cur < kStackSize) {
+                rl.rlim_cur = kStackSize;
+                result = setrlimit(RLIMIT_STACK, &rl);
+                success = (result == 0);
+                
+                if (!success) {
+                    std::cerr << "Failed to increase stack size on Linux. Error code: " 
+                              << result << std::endl;
+                }
+            } else {
+                success = true; // Already sufficient
+            }
+        }
+    #endif
+    
+    if (success) {
+        std::cout << "Stack size set to " << stack_size_mb << "MB" << std::endl;
+    }
+    
+    return success;
+}
+
 
 // Prototypes for half-precision conversion functions.
 uint16_t float_to_half(float f);
@@ -256,7 +293,7 @@ int buildTreeInPlace(T* emb, int32_t* vals, int start, int count, int dim, NodeI
     int vpIndex = start;
     // Compute distances from each embedding (except vp) to the vantage point.
     //#pragma omp parallel for
-    for (int i = start+1; i < start + count; i++) {
+    for (int i = start + 1; i < start + count; i++) {
         buffer[i - start - 1] = manhattanDistance(emb, i, vpIndex, dim);
     }
     // Find median of these distances.
@@ -265,12 +302,16 @@ int buildTreeInPlace(T* emb, int32_t* vals, int start, int count, int dim, NodeI
     float median = buffer[m + 1];
 
     // Partition embeddings in [start, start+count-1) by median.
-    int i = start + 1, j = start + count - 1;
+    int i = start + 1, j = start + count - 1, d = 0, swapBuff = 0;
     while (i <= j) {
-        float d = manhattanDistance(emb, i, vpIndex, dim);
+        //float d = manhattanDistance(emb, i, vpIndex, dim);
+        d = buffer[i - start - 1];
         if (d <= median) {
             i++;
         } else {
+            swapBuff = buffer[j - start];
+            buffer[j - start] = buffer[i - start];
+            buffer[i - start] = swapBuff;
             swapEmbAndVal(emb, vals, i, j, dim);
             j--;
         }
@@ -308,6 +349,7 @@ public:
     bool build(const std::string& embedFile, const std::string& valueFile, int dim) {
         std::cerr << "Building..." << std::endl;
         std::cerr.flush();
+        bool b = increase_stack_size(128);
         dimension = dim;
         // Open embeddings file (read-write).
         #ifdef _WIN32
@@ -399,7 +441,6 @@ public:
         std::cerr << "Number of points: " << num_points << std::endl;
         std::cerr.flush();
         float* buffer = new float[num_points];
-        return true;
         // Build the tree in place (reordering both embeddings and values) and fill nodeInfos.
         buildTreeInPlace(emb, vals, 0, num_points, dimension, nodeInfos, buffer);
         delete[] buffer;
