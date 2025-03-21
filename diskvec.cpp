@@ -15,6 +15,7 @@
 #include <fstream>
 #include <limits>
 #include <cstring>     // For memcpy
+#include <stack>
 
 // Platform-specific includes
 #ifdef _WIN32
@@ -125,44 +126,7 @@
     #include <sys/stat.h>
     #include <fcntl.h>
     #include <unistd.h>
-    #include <sys/resource.h>
 #endif
-
-
-bool increase_stack_size(size_t stack_size_mb) {
-    const size_t kStackSize = stack_size_mb * 1024 * 1024; // Convert MB to bytes
-    bool success = false;
-    
-    #ifdef _WIN32
-        return true;
-    #else
-        // Linux/Unix implementation
-        struct rlimit rl;
-        int result = getrlimit(RLIMIT_STACK, &rl);
-        
-        if (result == 0) {
-            if (rl.rlim_cur < kStackSize) {
-                rl.rlim_cur = kStackSize;
-                result = setrlimit(RLIMIT_STACK, &rl);
-                success = (result == 0);
-                
-                if (!success) {
-                    std::cerr << "Failed to increase stack size on Linux. Error code: " 
-                              << result << std::endl;
-                }
-            } else {
-                success = true; // Already sufficient
-            }
-        }
-    #endif
-    
-    if (success) {
-        std::cout << "Stack size set to " << stack_size_mb << "MB" << std::endl;
-    }
-    
-    return success;
-}
-
 
 // Prototypes for half-precision conversion functions.
 uint16_t float_to_half(float f);
@@ -277,7 +241,7 @@ float manhattanDistance(T* emb, int idx, const std::vector<float>& query, int di
 // and the corresponding values (in the range [start, start+count)).
 // It writes node info into 'nodeInfos'. 'buffer' is a temporary float array.
 template <typename T>
-int buildTreeInPlace(T* emb, int32_t* vals, int start, int count, int dim, NodeInfo* nodeInfos, float* buffer) {
+int buildTreeInPlace1(T* emb, int32_t* vals, int start, int count, int dim, NodeInfo* nodeInfos, float* buffer) {
     if (count <= 0)
         return 0;
     if (count == 1) {
@@ -310,8 +274,8 @@ int buildTreeInPlace(T* emb, int32_t* vals, int start, int count, int dim, NodeI
             i++;
         } else {
             swapBuff = buffer[j - start];
-            buffer[j - start] = buffer[i - start];
-            buffer[i - start] = swapBuff;
+            buffer[j - start] = buffer[i - start - 1];
+            buffer[i - start - 1] = swapBuff;
             swapEmbAndVal(emb, vals, i, j, dim);
             j--;
         }
@@ -328,6 +292,133 @@ int buildTreeInPlace(T* emb, int32_t* vals, int start, int count, int dim, NodeI
     nodeInfos[start].totalSize = totalSize;
     return totalSize;
 }
+
+
+
+
+
+
+
+template <typename T>
+void buildTreeInPlace2(T* emb, int32_t* vals, int start, int count, int dim, NodeInfo* nodeInfos, float* buffer) {
+    if (count <= 0)
+        return;
+    if (count == 1) {
+        nodeInfos[start].threshold = 0;
+        nodeInfos[start].leftSize = 0;
+        nodeInfos[start].totalSize = 1;
+        return;
+    }
+    // Choose a random vantage point from current segment.
+    int pivot = start + (std::rand() % count);
+    // Swap chosen vantage point to the end (reordering both embeddings and values).
+    swapEmbAndVal(emb, vals, pivot, start, dim);
+    int vpIndex = start;
+    // Compute distances from each embedding (except vp) to the vantage point.
+    //#pragma omp parallel for
+    for (int i = start + 1; i < start + count; i++) {
+        buffer[i - start - 1] = manhattanDistance(emb, i, vpIndex, dim);
+    }
+    // Find median of these distances.
+    int m = (count - 1) / 2;
+    std::nth_element(buffer, buffer + m + 1, buffer + count);
+    float median = buffer[m + 1];
+
+    // Partition embeddings in [start, start+count-1) by median.
+    int i = start + 1, j = start + count - 1, d = 0;
+    while (i <= j) {
+        d = buffer[i - start - 1];
+        if (d <= median) {
+            i++;
+        } else {
+            std::swap(buffer[j - start], buffer[i - start - 1]);
+            swapEmbAndVal(emb, vals, i, j, dim);
+            j--;
+        }
+    }
+    int leftCount = i - start - 1;
+    nodeInfos[start].threshold = median;
+    nodeInfos[start].leftSize = leftCount;
+    nodeInfos[start].totalSize = count;
+    buildTreeInPlace(emb, vals, start + 1, leftCount, dim, nodeInfos, buffer);
+    buildTreeInPlace(emb, vals, start + 1 + leftCount, count - 1 - leftCount, dim, nodeInfos, buffer);
+}
+
+
+
+
+
+
+template <typename T>
+void buildTreeInPlace(T* emb, int32_t* vals, int start, int count, int dim, NodeInfo* nodeInfos, float* buffer) {
+    
+    struct Frame {
+        int start;
+        int count;
+    };
+
+    std::stack<Frame> stack;
+    stack.push({start, count});
+    
+    while (!stack.empty()) {
+        Frame current = stack.top();
+        stack.pop();
+        int currStart = current.start;
+        int currCount = current.count;
+        
+        if (currCount <= 0)
+            continue;
+        if (currCount == 1) {
+            nodeInfos[currStart].threshold = 0;
+            nodeInfos[currStart].leftSize = 0;
+            nodeInfos[currStart].totalSize = 1;
+            continue;
+        }
+        
+        // Choose a random vantage point from current segment.
+        int pivot = currStart + (std::rand() % currCount);
+        // Swap chosen vantage point to the beginning (or any designated location)
+        swapEmbAndVal(emb, vals, pivot, currStart, dim);
+        int vpIndex = currStart;
+        
+        // Compute distances from each embedding (except vp) to the vantage point.
+        for (int i = currStart + 1; i < currStart + currCount; i++) {
+            buffer[i - currStart - 1] = manhattanDistance(emb, i, vpIndex, dim);
+        }
+        
+        // Find median of these distances.
+        int m = (currCount - 1) / 2;
+        std::nth_element(buffer, buffer + m + 1, buffer + currCount);
+        float median = buffer[m + 1];
+        
+        // Partition embeddings in [currStart, currStart+currCount) by median.
+        int i = currStart + 1, j = currStart + currCount - 1;
+        while (i <= j) {
+            int d = buffer[i - currStart - 1];
+            if (d <= median) {
+                i++;
+            } else {
+                std::swap(buffer[j - currStart], buffer[i - currStart - 1]);
+                swapEmbAndVal(emb, vals, i, j, dim);
+                j--;
+            }
+        }
+        int leftCount = i - currStart - 1;
+        nodeInfos[currStart].threshold = median;
+        nodeInfos[currStart].leftSize = leftCount;
+        nodeInfos[currStart].totalSize = currCount;
+        
+        // Push the two child segments onto the stack.
+        // Process right child first, then left child.
+        stack.push({currStart + 1 + leftCount, currCount - 1 - leftCount});
+        stack.push({currStart + 1, leftCount});
+    }
+}
+
+
+
+
+
 
 // ------------------------------
 // VP-Tree class that reorders embeddings and values in place.
@@ -349,7 +440,6 @@ public:
     bool build(const std::string& embedFile, const std::string& valueFile, int dim) {
         std::cerr << "Building..." << std::endl;
         std::cerr.flush();
-        bool b = increase_stack_size(128);
         dimension = dim;
         // Open embeddings file (read-write).
         #ifdef _WIN32
