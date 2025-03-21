@@ -340,6 +340,7 @@ public:
             std::cerr.flush();
             return false;
         }
+        return true;
         // Open values file (read-write). Assumed to be int32_t per embedding.
         #ifdef _WIN32
         val_fd = ::_open(valueFile.c_str(), _O_RDWR | _O_BINARY);
