@@ -340,7 +340,6 @@ public:
             std::cerr.flush();
             return false;
         }
-        return true;
         // Open values file (read-write). Assumed to be int32_t per embedding.
         #ifdef _WIN32
         val_fd = ::_open(valueFile.c_str(), _O_RDWR | _O_BINARY);
@@ -399,6 +398,7 @@ public:
         // Allocate temporary distance buffer.
         std::cerr << "Number of points: " << num_points << std::endl;
         std::cerr.flush();
+        return true;
         float* buffer = new float[num_points];
         // Build the tree in place (reordering both embeddings and values) and fill nodeInfos.
         buildTreeInPlace(emb, vals, 0, num_points, dimension, nodeInfos, buffer);
