@@ -306,6 +306,7 @@ public:
     // and write node info into "tree.dat".
     // 'embedFile' and 'valueFile' are the filenames for embeddings and values.
     bool build(const std::string& embedFile, const std::string& valueFile, int dim) {
+        std::cout.setf(std::ios::unitbuf);
         std::cout << "Building..." << std::endl;
         dimension = dim;
         // Open embeddings file (read-write).
