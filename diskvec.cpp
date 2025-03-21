@@ -306,8 +306,8 @@ public:
     // and write node info into "tree.dat".
     // 'embedFile' and 'valueFile' are the filenames for embeddings and values.
     bool build(const std::string& embedFile, const std::string& valueFile, int dim) {
-        std::cout.setf(std::ios::unitbuf);
         std::cout << "Building..." << std::endl;
+        std::cout.flush();
         dimension = dim;
         // Open embeddings file (read-write).
         #ifdef _WIN32
@@ -316,22 +316,28 @@ public:
         embed_fd = ::open(embedFile.c_str(), O_RDWR);
         #endif
         std::cout << "Embedding file opened" << std::endl;
+        std::cout.flush();
         if (embed_fd < 0) {
             std::cerr << "Error opening embeddings file: " << embedFile << std::endl;
+            std::cout.flush();
             return false;
         }
         struct stat st;
         if (fstat(embed_fd, &st) < 0) {
             std::cerr << "Error fstat on embeddings file." << std::endl;
+            std::cout.flush();
             return false;
         }
         size_t fileSize = st.st_size;
         num_points = fileSize / (dimension * sizeof(T));
         std::cout << "Mapping embedding memory " << num_points << std::endl;
+        std::cout.flush();
         emb = (T*) mmap(nullptr, fileSize, PROT_READ | PROT_WRITE, MAP_SHARED, embed_fd, 0);
         std::cout << "Embedding memory mapped " << num_points << std::endl;
+        std::cout.flush();
         if (emb == MAP_FAILED) {
             std::cerr << "Error mmapping embeddings file." << std::endl;
+            std::cout.flush();
             return false;
         }
         // Open values file (read-write). Assumed to be int32_t per embedding.
@@ -341,23 +347,28 @@ public:
         val_fd = ::open(valueFile.c_str(), O_RDWR);
         #endif
         std::cout << "Opening values file" << std::endl;
+        std::cout.flush();
         if (val_fd < 0) {
             std::cerr << "Error opening values file: " << valueFile << std::endl;
+            std::cout.flush();
             return false;
         }
         struct stat vst;
         if (fstat(val_fd, &vst) < 0) {
             std::cerr << "Error fstat on values file." << std::endl;
+            std::cout.flush();
             return false;
         }
         size_t valSize = vst.st_size;
         if (valSize != num_points * sizeof(int32_t)) {
             std::cerr << "Mismatch between embeddings and values count." << std::endl;
+            std::cout.flush();
             return false;
         }
         vals = (int32_t*) mmap(nullptr, valSize, PROT_READ | PROT_WRITE, MAP_SHARED, val_fd, 0);
         if (vals == MAP_FAILED) {
             std::cerr << "Error mmapping values file." << std::endl;
+            std::cout.flush();
             return false;
         }
         // Create thresholds file ("tree.dat").
@@ -369,20 +380,24 @@ public:
         #endif
         if (thresh_fd < 0) {
             std::cerr << "Error creating thresholds file." << std::endl;
+            std::cout.flush();
             return false;
         }
         size_t threshSize = num_points * sizeof(NodeInfo);
         if (::ftruncate(thresh_fd, threshSize) < 0) {
             std::cerr << "Error truncating thresholds file." << std::endl;
+            std::cout.flush();
             return false;
         }
         nodeInfos = (NodeInfo*) mmap(nullptr, threshSize, PROT_READ | PROT_WRITE, MAP_SHARED, thresh_fd, 0);
         if (nodeInfos == MAP_FAILED) {
             std::cerr << "Error mmapping thresholds file." << std::endl;
+            std::cout.flush();
             return false;
         }
         // Allocate temporary distance buffer.
         std::cout << "Number of points: " << num_points << std::endl;
+        std::cout.flush();
         float* buffer = new float[num_points];
         // Build the tree in place (reordering both embeddings and values) and fill nodeInfos.
         buildTreeInPlace(emb, vals, 0, num_points, dimension, nodeInfos, buffer);
