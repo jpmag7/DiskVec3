@@ -190,7 +190,7 @@ public:
             size_t offset = i * chunk_size;
             size_t this_chunk_size = std::min<size_t>(chunk_size, file_size - offset);
             void* mapped = mmap(nullptr, this_chunk_size, PROT_READ | PROT_WRITE, MAP_SHARED, fd, offset);
-            std::cout << "Mapped offset: " << offset << " chunk_size: " << chunk_index << " num_chunks: " << num_chunks << " this_chunk_size: " << this_chunk_size << std::endl;
+            std::cout << "Mapped offset: " << offset << " chunk_size: " << chunk_size << " num_chunks: " << num_chunks << " this_chunk_size: " << this_chunk_size << std::endl;
             std::cout.flush();
             if (mapped == MAP_FAILED) {
                 std::cout << this_chunk_size << " " << offset << " " << num_chunks << " " << i << std::endl;
