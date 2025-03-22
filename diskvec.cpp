@@ -126,6 +126,8 @@
     #include <sys/stat.h>
     #include <fcntl.h>
     #include <unistd.h>
+    #include <cerrno>
+    #include <cstdio>
 #endif
 
 // Prototypes for half-precision conversion functions.
@@ -465,6 +467,11 @@ public:
         std::cerr << "Mapping embedding memory " << num_points << std::endl;
         std::cerr.flush();
         emb = (T*) mmap(nullptr, fileSize, PROT_READ | PROT_WRITE, MAP_SHARED, embed_fd, 0);
+        #ifndef _WIN32
+        if (madvise(emb, fileSize, MADV_SEQUENTIAL) != 0) {
+            perror("madvise MADV_SEQUENTIAL");
+        }
+        #endif
         std::cerr << "Embedding memory mapped " << num_points << std::endl;
         std::cerr.flush();
         if (emb == MAP_FAILED) {
@@ -498,6 +505,11 @@ public:
             return false;
         }
         vals = (int32_t*) mmap(nullptr, valSize, PROT_READ | PROT_WRITE, MAP_SHARED, val_fd, 0);
+        #ifndef _WIN32
+        if (madvise(vals, valSize, MADV_SEQUENTIAL) != 0) {
+            perror("madvise MADV_SEQUENTIAL");
+        }
+        #endif
         if (vals == MAP_FAILED) {
             std::cerr << "Error mmapping values file." << std::endl;
             std::cerr.flush();
@@ -522,6 +534,11 @@ public:
             return false;
         }
         nodeInfos = (NodeInfo*) mmap(nullptr, threshSize, PROT_READ | PROT_WRITE, MAP_SHARED, thresh_fd, 0);
+        #ifndef _WIN32
+        if (madvise(nodeInfos, threshSize, MADV_SEQUENTIAL) != 0) {
+            perror("madvise MADV_SEQUENTIAL");
+        }
+        #endif
         if (nodeInfos == MAP_FAILED) {
             std::cerr << "Error mmapping thresholds file." << std::endl;
             std::cerr.flush();
