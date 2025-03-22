@@ -216,7 +216,7 @@ public:
         // std::cout << "mmap chk_idx: " << chunk_index << " offset: " << offset << " index: " << index << std::endl;
         // std::cout.flush();
         if (chunk_index >= num_chunks) {
-            std::cout << ">>> " << chunk_index << "  " << num_chunks << "  " << offset << "  " << index << "  " << typeid(T).name() << std::endl;
+            std::cout << "idx: " << idx << " chunk_size: " << chunk_index << " num_chunks: " << num_chunks << " offset: " << offset << " index: " << index << " type: " << typeid(T).name() << std::endl;
             std::cout.flush();
             throw std::out_of_range("Index out of mapped range (mp6)");
         }
