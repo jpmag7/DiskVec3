@@ -182,6 +182,8 @@ public:
 
         this->file_size = st.st_size;
         num_chunks = (this->file_size + chunk_size - 1) / chunk_size;
+        std::cout << "File size: " << this->file_size << " chunk_size: " << chunk_size << " num_chunks: " << num_chunks << std::endl;
+        std::cout.flush();
         mapChunks();
     }
 
