@@ -300,21 +300,23 @@ struct NodeInfo {
     int totalSize;   // total nodes in this subtree (including current node)
 };
 
-// ------------------------------
-// Helper: swap one embedding and its corresponding value.
-// 'emb' is a pointer to the embeddings array (of type T),
-// 'vals' is a pointer to the values array (int32_t).
-// Each embedding has 'dim' elements.
+template <typename T>
+void swap(T& a, T& b) {
+    T temp = a;
+    a = b;
+    b = temp;
+}
+
 template <typename T>
 void swapEmbAndVal(MappedFile<T>* emb, MappedFile<int32_t>* vals, int idx1, int idx2, int dim) {
     // Swap embeddings.
     // std::cout << "swap" << std::endl;
     // std::cout.flush();
     for (int i = 0; i < dim; i++) {
-        std::swap((*emb)[idx1 * dim + i], (*emb)[idx2 * dim + i]);
+        swap<T>((*emb)[idx1 * dim + i], (*emb)[idx2 * dim + i]);
     }
     // Swap corresponding values.
-    std::swap((*vals)[idx1], (*vals)[idx2]);
+    swap<int32_t>((*vals)[idx1], (*vals)[idx2]);
 }
 
 // ------------------------------
