@@ -17,6 +17,7 @@
 #include <limits>
 #include <cstring>
 #include <stack>
+#include <tuple>
 
 
 #ifdef _WIN32
